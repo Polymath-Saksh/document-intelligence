@@ -1,0 +1,12 @@
+sentence-transformers
+torch
+rank-bm25
+spacy
+transformers
+pymupdf
+pandas
+numpy
+glob
+gast
+tensorflow
+tf-keras

@@ -1,0 +1,6 @@
+test_ds/
+__pycache__/
+*.pyc
+*.ipynb
+*.pdf
+test/
