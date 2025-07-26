@@ -1,7 +1,11 @@
 
 # ENHANCED PDF OUTLINE EXTRACTION - UNSUPERVISED IMPROVEMENTS
 # ===========================================================
-from r1a.utils import *
+from r1a.utils import (
+    extract_spans, filter_outline_candidates,
+    add_outline_levels, merge_outline_fragments,
+    build_outline_json_from_merged
+)
 import pymupdf #type: ignore[import]
 import pandas as pd #type: ignore[import]
 import numpy as np
@@ -216,67 +220,10 @@ def classify_heading_enhanced(row: pd.Series, font_analysis: Dict,
     return best_class, confidence
 
 # MAIN ENHANCED PROCESSING FUNCTION
-def process_pdf_enhanced(pdf_path: str) -> Dict:
-    """Enhanced PDF processing with improved heuristics"""
-
-    doc = pymupdf.open(pdf_path)
-    df = extract_spans(doc)
-
-    # Step 1: Global font analysis
-    font_analysis = analyze_fonts_globally(df)
-
-    # Step 2: Enhanced position features
-    df = extract_position_features(df)
-
-    # Step 3: Filter candidates with multiple criteria
-    candidates = df[
-        (df['size_norm'] >= 0.6) |  # Large font
-        (df['is_bold']) |           # Bold text
-        (df['text'].str.len() >= 3) # Minimum length
-    ].copy()
-
-    # Step 4: Enhanced classification
-    results = []
-    for idx, row in candidates.iterrows():
-        # Linguistic analysis
-        linguistic = analyze_linguistic_patterns(row['text'])
-
-        # Context analysis
-        context = analyze_context(df, idx) #type: ignore
-
-        # Enhanced classification
-        classification, confidence = classify_heading_enhanced(
-            row, font_analysis, linguistic, context
-        )
-
-        if classification != 'none' and confidence > 0.3:
-            results.append({
-                'text': row['text'].strip(),
-                'level': classification,
-                'page': row['page'],
-                'confidence': confidence,
-                'font_size': row['size'],
-                'is_bold': row['is_bold']
-            })
-
-    # Step 5: Post-processing and hierarchy validation
-    results = sorted(results, key=lambda x: (x['page'], -x['font_size']))
-
-    # Build final output
-    title = ""
-    outline = []
-
-    for item in results:
-        if item['level'] == 'title' and not title:
-            title = item['text']
-        elif item['level'] in ['h1', 'h2', 'h3']:
-            outline.append({
-                'level': item['level'].upper(),
-                'text': item['text'],
-                'page': item['page']
-            })
-
-    return {
-        'title': title,
-        'outline': outline[:50]  # Limit to prevent overload
-    }
+def process_pdf_enhanced(pdf_path: str):
+    doc      = pymupdf.open(pdf_path)
+    df       = extract_spans(doc)
+    cand     = filter_outline_candidates(df)
+    leveled  = add_outline_levels(cand)
+    merged   = merge_outline_fragments(leveled)
+    return build_outline_json_from_merged(merged)

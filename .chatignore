@@ -1,0 +1,19 @@
+# .chatignore
+# Add files and directories to ignore for chat-based tools and assistants
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.tmp
+*.bak
+*.swp
+.DS_Store
+.env
+.venv
+.idea/
+.vscode/
+*.egg-info/
+# Ignore test outputs and large data
+/test/outputs/
+/test_ds/
