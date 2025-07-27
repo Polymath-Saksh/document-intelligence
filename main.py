@@ -35,6 +35,7 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 # ─────────────────────────  Helpers  ──────────────────────────
 def _extract_outline_blob(pdf_path: str) -> Dict:
     """Worker: run Round-1A on a PDF file path."""
+    # This import is intentionally local to the worker process
     from r1a.enhanced_pdf_extractor import process_pdf_enhanced
     return process_pdf_enhanced(pdf_path)
 
@@ -90,12 +91,36 @@ def run_pipeline(input_dir: str, output_dir: str) -> None:
     # 3.  Process each PDF
     for d in req["documents"]:
         fname   = d["filename"]
-        outline = outlines.get(fname, {}).get("outline", [])
+        outline_data = outlines.get(fname, {})
+        outline = outline_data.get("outline", [])
 
-        # inject cover-page title
-        title_txt = outlines[fname].get("title", "").strip() if fname in outlines else ""
+        # --- FIX START: Handle title separately and aggressively find one if needed ---
+        title_txt = outline_data.get("title", "").strip()
+        
+        # Aggressive title finding: If the extractor fails, assume the first heading
+        # on page 1 is the title. This is a workaround for a potentially strict
+        # title extraction logic in the upstream `enhanced_pdf_extractor`.
+        if not title_txt and outline and outline[0].get("page") == 1:
+            potential_title = outline.pop(0)  # Remove from outline to avoid duplication
+            title_txt = potential_title.get("text", "").strip()
+
+        title_was_added = False
         if title_txt:
-            outline.insert(0, {"level": "H1", "text": title_txt, "page": 1})
+            # Add the main title with the highest importance rank (1)
+            extracted_sections.append({
+                "document": fname,
+                "section_title": title_txt,
+                "importance_rank": 1,
+                "page_number": 1
+            })
+            # For subsection analysis, we can use the title itself as the "refined text"
+            subsection_analysis.append({
+                "document": fname,
+                "refined_text": title_txt,
+                "page_number": 1
+            })
+            title_was_added = True
+        # --- FIX END ---
 
         if not outline:
             continue
@@ -119,10 +144,12 @@ def run_pipeline(input_dir: str, output_dir: str) -> None:
             refined_list = list(tpool.map(_ref, top5))
 
         for sec, refined in zip(top5, refined_list):
+            # Adjust rank if a title was already added for this document to maintain hierarchy
+            rank_offset = 1 if title_was_added else 0
             extracted_sections.append({
                 "document": fname,
                 "section_title": sec["title"],
-                "importance_rank": sec["rank"],
+                "importance_rank": sec["rank"] + rank_offset,
                 "page_number": sec["page"]
             })
             subsection_analysis.append({
