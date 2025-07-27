@@ -1,0 +1,15 @@
+test_ds/
+__pycache__/
+*.pyc
+*.ipynb
+*.pdf
+test/
+cache/
+models/all-MiniLM-L6-v2
+models/all-MiniLM-L12-v2
+.cache/
+.env
+*.md
+.gitattributes
+.gitignore
+.chatignore

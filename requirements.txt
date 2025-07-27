@@ -1,12 +1,6 @@
-sentence-transformers
-torch
-rank-bm25
-spacy
-transformers
-pymupdf
-pandas
 numpy
-glob
-gast
-tensorflow
-tf-keras
+pandas
+pymupdf
+sentence-transformers
+torch --index-url https://download.pytorch.org/whl/cpu
+rank_bm25
