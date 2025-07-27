@@ -49,6 +49,23 @@ python main.py <input_directory> <output_directory>
 python main.py input/ output/
 ```
 
+### Docker Usage
+
+To build and run the application using Docker, follow these steps:
+
+1.  **Build the Docker Image**:
+    Navigate to the project root directory where the `Dockerfile` is located and run:
+    ```bash
+    docker build -t document-intelligence .
+    ```
+
+2.  **Run the Docker Container**:
+    You can run the container, mounting your `input` and `output` directories to allow the container to access your PDF files and save results.
+    ```bash
+    docker run -v "$(pwd)/input:/app/input" -v "$(pwd)/output:/app/output" document-intelligence python main.py input/ output/
+    ```
+    *Note: Ensure the `granite-embedding-107m-multilingual` model is placed in `input/models/models/` before building the image, as per the Setup instructions.*
+
 ### Input Configuration
 
 The `input_directory` should contain a JSON file (e.g., `challenge1b_input.json`) that specifies the documents to be processed, along with a persona and a job-to-be-done. The structure of this JSON file should be as follows:
