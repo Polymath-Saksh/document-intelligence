@@ -22,7 +22,6 @@ from typing import Dict, List
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
-import pymupdf                       # PyMuPDF – only imported in parent
 
 # Round-1B modules
 from semantic_analyzer    import SemanticAnalyzer
