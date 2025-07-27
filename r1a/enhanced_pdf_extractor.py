@@ -1,229 +1,229 @@
+# ENHANCED PDF OUTLINE EXTRACTION - V3.1 (BUG FIX)
+# ==========================================================
+# This version fixes a "Column not found: y1" error in the
+# extract_position_features function.
 
-# ENHANCED PDF OUTLINE EXTRACTION - UNSUPERVISED IMPROVEMENTS
-# ===========================================================
-from r1a.utils import (
-    extract_spans, filter_outline_candidates,
-    add_outline_levels, merge_outline_fragments,
-    build_outline_json_from_merged
-)
-import pymupdf #type: ignore[import]
-import pandas as pd #type: ignore[import]
+from utils import extract_spans
+import pymupdf  # type: ignore[import]
+import pandas as pd  # type: ignore[import]
 import numpy as np
 import re
-from collections import Counter, defaultdict
-import string
-from typing import Dict, List, Tuple, Optional
+from collections import Counter
+from typing import Dict, List, Tuple
 
-# 1. CROSS-PAGE FONT ANALYSIS - Major improvement for consistency
+# 1. CROSS-PAGE FONT ANALYSIS - Unchanged
 def analyze_fonts_globally(df: pd.DataFrame) -> Dict:
-    """Analyze font patterns across entire document for better consistency"""
-
-    # Font size clustering across all pages
-    all_sizes = df['size'].values
-    size_clusters = {}
-
-    # Use simple clustering based on size gaps
+    """Analyze font patterns across the entire document for better consistency."""
     unique_sizes = sorted(df['size'].unique(), reverse=True)
+    if not unique_sizes:
+        return {'size_clusters': {}, 'font_frequency': {}, 'total_spans': len(df)}
+
     clusters = []
     current_cluster = [unique_sizes[0]]
 
     for i in range(1, len(unique_sizes)):
-        # If size difference is less than 10% of current size, group together
         if (current_cluster[0] - unique_sizes[i]) / current_cluster[0] < 0.1:
             current_cluster.append(unique_sizes[i])
         else:
             clusters.append(current_cluster)
             current_cluster = [unique_sizes[i]]
-
     clusters.append(current_cluster)
 
-    # Assign cluster rankings
-    for rank, cluster in enumerate(clusters, 1):
-        for size in cluster:
-            size_clusters[size] = rank
-
-    # Font family analysis
+    size_clusters = {size: rank for rank, cluster in enumerate(clusters, 1) for size in cluster}
     font_patterns = Counter(df['font'].values)
-    common_fonts = {font: count for font, count in font_patterns.items()}
 
     return {
         'size_clusters': size_clusters,
-        'font_frequency': common_fonts,
+        'font_frequency': dict(font_patterns),
         'total_spans': len(df)
     }
 
-# 2. ENHANCED POSITION FEATURES - Using bounding box data
+# 2. OPTIMIZED POSITION FEATURE EXTRACTION - CORRECTED
 def extract_position_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Extract position-based features from bounding boxes"""
-
+    """Extract position-based features from bounding boxes using vectorized operations."""
     df_enhanced = df.copy()
-
-    # Extract position metrics from bbox [x0, y0, x1, y1]
-    df_enhanced['x0'] = df_enhanced['bbox'].apply(lambda x: x[0])
-    df_enhanced['y0'] = df_enhanced['bbox'].apply(lambda x: x[1])
-    df_enhanced['x1'] = df_enhanced['bbox'].apply(lambda x: x[2])
-    df_enhanced['y1'] = df_enhanced['bbox'].apply(lambda x: x[3])
-
-    # Position features
-    df_enhanced['width'] = df_enhanced['x1'] - df_enhanced['x0']
+    bboxes = df_enhanced['bbox'].tolist()
+    df_enhanced['x0'] = [b[0] for b in bboxes]
+    df_enhanced['y0'] = [b[1] for b in bboxes]
+    df_enhanced['x1'] = [b[2] for b in bboxes]
+    df_enhanced['y1'] = [b[3] for b in bboxes]
     df_enhanced['height'] = df_enhanced['y1'] - df_enhanced['y0']
     df_enhanced['left_margin'] = df_enhanced['x0']
-    df_enhanced['center_x'] = (df_enhanced['x0'] + df_enhanced['x1']) / 2
+    
+    # Get page height for positional scoring later
+    # BUG FIX: This calculation must be done on df_enhanced where 'y1' exists.
+    page_heights = df_enhanced.groupby('page')['y1'].max()
+    df_enhanced['page_height'] = df_enhanced['page'].map(page_heights)
 
-    # Page-relative positioning
-    for page in df_enhanced['page'].unique():
-        page_mask = df_enhanced['page'] == page
-        page_data = df_enhanced[page_mask]
-
-        # Calculate relative positions within page
-        df_enhanced.loc[page_mask, 'left_margin_norm'] =             (page_data['left_margin'] - page_data['left_margin'].min()) /             (page_data['left_margin'].max() - page_data['left_margin'].min() + 1e-6)
-
-        df_enhanced.loc[page_mask, 'y_position_norm'] =             page_data['y0'] / page_data['y0'].max()
-
+    page_groups = df_enhanced.groupby('page')
+    page_min_margin = page_groups['left_margin'].transform('min')
+    page_max_margin = page_groups['left_margin'].transform('max')
+    df_enhanced['left_margin_norm'] = (df_enhanced['left_margin'] - page_min_margin) / \
+                                      (page_max_margin - page_min_margin + 1e-6)
     return df_enhanced
 
-# 3. LINGUISTIC PATTERN DETECTION - Rule-based approach
-def analyze_linguistic_patterns(text: str) -> Dict:
-    """Analyze text for heading-like linguistic patterns"""
+# 3. VECTORIZED LINGUISTIC & CONTEXT FEATURES - Combined and Unchanged
+def apply_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Vectorized creation of linguistic and context features."""
+    # Linguistic
+    text_stripped = df['text'].str.strip()
+    df['has_section_pattern'] = text_stripped.str.match(r'^\d+\.?\d*', na=False)
+    df['word_count'] = df['text'].str.split().str.len().fillna(0)
+    heading_keywords = {'introduction', 'conclusion', 'abstract', 'summary', 'background', 'methodology', 'results', 'discussion', 'chapter', 'section', 'references'}
+    df['has_heading_keyword'] = df['text'].str.lower().str.split().apply(
+        lambda words: any(word.strip(".,:") in heading_keywords for word in words) if isinstance(words, list) else False
+    )
+    
+    # Context
+    df_sorted = df.sort_values(['page', 'y0']).reset_index()
+    df_sorted['prev_y1'] = df_sorted.groupby('page')['y1'].shift(1)
+    vertical_gap = df_sorted['y0'] - df_sorted['prev_y1']
+    df_sorted['large_gap_before'] = vertical_gap > df_sorted['height'] * 1.5
+    df_sorted.loc[df_sorted.groupby('page').head(1).index, 'large_gap_before'] = True
+    return df_sorted.set_index('index').sort_index()
 
-    patterns = {
-        'has_numbers': bool(re.search(r'\d', text)),
-        'starts_with_number': bool(re.match(r'^\d', text.strip())),
-        'has_section_pattern': bool(re.match(r'^\d+\.\d*', text.strip())),
-        'all_caps': text.isupper() and len(text) > 1,
-        'title_case': text.istitle(),
-        'word_count': len(text.split()),
-        'avg_word_length': np.mean([len(word) for word in text.split()]),
-        'has_colon': ':' in text,
-        'ends_with_period': text.strip().endswith('.'),
-        'starts_with_article': text.lower().strip().startswith(('the ', 'a ', 'an ')),
-    }
+# 4. HEADING/TITLE MERGING LOGIC (with Junk Filtering)
+def merge_candidates(candidates_df: pd.DataFrame, is_title: bool = False) -> List[Dict]:
+    """Merges consecutive text spans that form a single heading or title."""
+    if candidates_df.empty:
+        return []
 
-    # Common heading keywords
-    heading_keywords = {
-        'introduction', 'conclusion', 'abstract', 'summary', 'background',
-        'methodology', 'method', 'results', 'discussion', 'chapter',
-        'section', 'overview', 'analysis', 'findings', 'references'
-    }
+    merged = []
+    candidates_df = candidates_df.sort_values(['page', 'y0'])
+    
+    buffer = []
+    for _, row in candidates_df.iterrows():
+        text = row['text'].strip()
+        if not text: continue
 
-    words_lower = [word.lower().strip(string.punctuation) for word in text.split()]
-    patterns['has_heading_keyword'] = any(word in heading_keywords for word in words_lower)
+        if not buffer:
+            buffer.append(row)
+            continue
 
-    # Calculate pattern score
-    score = 0
-    if patterns['has_section_pattern']: score += 3
-    if patterns['has_numbers']: score += 1
-    if patterns['title_case'] or patterns['all_caps']: score += 2
-    if patterns['has_heading_keyword']: score += 2
-    if patterns['word_count'] <= 10: score += 1  # Headings are usually short
-    if not patterns['ends_with_period']: score += 1  # Headings rarely end with periods
-    if not patterns['starts_with_article']: score += 1  # Headings rarely start with articles
-
-    patterns['linguistic_score'] = score
-    return patterns
-
-# 4. CONTEXT-AWARE FILTERING - Analyze surrounding text
-def analyze_context(df: pd.DataFrame, idx: int, window: int = 2) -> Dict:
-    """Analyze text context around a potential heading"""
-
-    current_row = df.iloc[idx]
-    page = current_row['page']
-
-    # Get surrounding spans on the same page
-    page_spans = df[df['page'] == page].sort_values('y0')
-    current_idx_in_page = page_spans.index.get_loc(idx)
-
-    context = {
-        'before_spans': [],
-        'after_spans': [],
-        'is_page_start': current_idx_in_page < window,
-        'is_page_end': current_idx_in_page >= len(page_spans) - window,
-    }
-
-    # Get before and after text
-    start_idx = max(0, current_idx_in_page - window)
-    end_idx = min(len(page_spans), current_idx_in_page + window + 1)
-
-    for i in range(start_idx, current_idx_in_page):
-        context['before_spans'].append(page_spans.iloc[i]['text'])
-
-    for i in range(current_idx_in_page + 1, end_idx):
-        context['after_spans'].append(page_spans.iloc[i]['text'])
-
-    # Analyze vertical spacing (indicates paragraph breaks)
-    if current_idx_in_page > 0:
-        prev_span = page_spans.iloc[current_idx_in_page - 1]
-        vertical_gap = current_row['y0'] - prev_span['y1']
-        context['large_gap_before'] = vertical_gap > current_row['height'] * 1.5
-    else:
-        context['large_gap_before'] = True
-
-    return context
-
-# 5. ENHANCED CLASSIFICATION WITH MULTIPLE FEATURES
-def classify_heading_enhanced(row: pd.Series, font_analysis: Dict, 
-                            linguistic_patterns: Dict, context: Dict) -> Tuple[str, float]:
-    """Enhanced heading classification using multiple feature types"""
-
-    scores = {
-        'title': 0,
-        'h1': 0,
-        'h2': 0,
-        'h3': 0,
-        'none': 0
-    }
-
-    # Font size scoring
-    size_cluster = font_analysis['size_clusters'].get(row['size'], 999)
-    if size_cluster == 1:  # Largest font cluster
-        if row['page'] == 1:
-            scores['title'] += 5
+        prev_row = buffer[-1]
+        vertical_gap = row['y0'] - prev_row['y1']
+        
+        # Merge condition: same page, close vertically. For titles, be more lenient.
+        merge_threshold = row['height'] * 0.75 if is_title else row['height'] * 0.5
+        if row['page'] == prev_row['page'] and vertical_gap < merge_threshold:
+            buffer.append(row)
         else:
-            scores['h1'] += 4
-    elif size_cluster == 2:
-        scores['h1'] += 3
-        scores['h2'] += 2
-    elif size_cluster == 3:
-        scores['h2'] += 3
-        scores['h3'] += 2
-    else:
-        scores['none'] += 2
+            full_text = ' '.join([b['text'].strip() for b in buffer])
+            # JUNK FILTER: Ignore if it's mostly numbers/symbols and not a section heading
+            num_digits = sum(c.isdigit() for c in full_text)
+            num_alpha = sum(c.isalpha() for c in full_text)
+            is_mostly_numeric = num_digits > num_alpha and num_alpha < 5
+            
+            if not (is_mostly_numeric and not buffer[0].get('has_section_pattern', False)):
+                 merged.append({
+                    'text': full_text, 'page': int(buffer[0]['page']),
+                    'level': buffer[0]['level'], 'confidence': buffer[0]['confidence'],
+                    'y0': buffer[0]['y0'], 'page_height': buffer[0]['page_height']
+                })
+            buffer = [row]
+    
+    if buffer:
+        full_text = ' '.join([b['text'].strip() for b in buffer])
+        num_digits = sum(c.isdigit() for c in full_text)
+        num_alpha = sum(c.isalpha() for c in full_text)
+        is_mostly_numeric = num_digits > num_alpha and num_alpha < 5
+        if not (is_mostly_numeric and not buffer[0].get('has_section_pattern', False)):
+            merged.append({
+                'text': full_text, 'page': int(buffer[0]['page']),
+                'level': buffer[0]['level'], 'confidence': buffer[0]['confidence'],
+                'y0': buffer[0]['y0'], 'page_height': buffer[0]['page_height']
+            })
+            
+    return merged
 
-    # Style scoring
-    if row['is_bold']:
-        scores['title'] += 2
-        scores['h1'] += 2
-        scores['h2'] += 1
-        scores['h3'] += 1
+# 5. NEW - ADVANCED TITLE SCORING
+def score_title_candidate(candidate: Dict) -> float:
+    """Calculates a score based on content and position to identify the true title."""
+    text = candidate['text'].lower()
+    word_count = len(text.split())
+    
+    # Penalize affiliation keywords heavily
+    affiliation_keywords = ['university', 'department', 'institute', 'school', 'college', 'laboratory', 'center', 'china', 'usa', 'germany', 'australia']
+    if any(keyword in text for keyword in affiliation_keywords):
+        return -100.0
 
-    # Position scoring
-    if row.get('left_margin_norm', 0) < 0.1:  # Left-aligned
-        scores['title'] += 1
-        scores['h1'] += 1
+    # Penalize author-like lists (many commas, short words)
+    if text.count(',') > 3 and word_count > 5:
+        return -50.0
 
-    if context.get('large_gap_before', False):  # Has spacing before
-        scores['title'] += 2
-        scores['h1'] += 2
-        scores['h2'] += 1
+    score = candidate['confidence']
 
-    # Linguistic pattern scoring
-    linguistic_score = linguistic_patterns.get('linguistic_score', 0)
-    if linguistic_score > 5:
-        scores['title'] += 1
-        scores['h1'] += 1
-        scores['h2'] += 1
+    # Promote titles of reasonable length
+    if 5 <= word_count <= 25:
+        score += 2.0
+    # Penalize very short or very long text
+    elif word_count < 4 or word_count > 30:
+        score -= 1.0
+        
+    # Promote titles in the upper part of the page (but not the very top)
+    relative_y = candidate['y0'] / candidate.get('page_height', 792) # Default page height
+    if 0.1 < relative_y < 0.5:
+        score += 2.0
+        
+    return score
 
-    # Find best classification
-    best_class = max(scores, key=lambda k: scores[k])
-    confidence = scores[best_class] / sum(scores.values()) if sum(scores.values()) > 0 else 0
+# 6. MAIN PROCESSING FUNCTION (REWRITTEN FOR ACCURACY)
+def process_pdf_enhanced(pdf_path: str) -> Dict:
+    """Processes a PDF using advanced heuristics for high accuracy."""
+    doc = pymupdf.open(pdf_path)
+    df = extract_spans(doc)
 
-    return best_class, confidence
+    if df.empty: return {'title': '', 'outline': []}
 
-# MAIN ENHANCED PROCESSING FUNCTION
-def process_pdf_enhanced(pdf_path: str):
-    doc      = pymupdf.open(pdf_path)
-    df       = extract_spans(doc)
-    cand     = filter_outline_candidates(df)
-    leveled  = add_outline_levels(cand)
-    merged   = merge_outline_fragments(leveled)
-    return build_outline_json_from_merged(merged)
+    font_analysis = analyze_fonts_globally(df)
+    df = extract_position_features(df)
+    df = apply_features(df)
+
+    # Vectorized Scoring
+    scores_df = pd.DataFrame(index=df.index)
+    scores_df['title'] = 0; scores_df['h1'] = 0; scores_df['h2'] = 0; scores_df['h3'] = 0
+    
+    df['size_cluster'] = df['size'].map(font_analysis.get('size_clusters', {})).fillna(999)
+    scores_df['title'] += ((df['size_cluster'] == 1) & (df['page'] == 1)) * 5
+    scores_df['h1'] += (((df['size_cluster'] == 1) & (df['page'] != 1)) * 5) + ((df['size_cluster'] == 2) * 3)
+    scores_df['h2'] += (((df['size_cluster'] == 2) * 2) + ((df['size_cluster'] == 3) * 3))
+    scores_df['h3'] += (df['size_cluster'] == 3) * 2
+
+    scores_df['title'] += df['is_bold'] * 2 + df['large_gap_before'] * 2
+    scores_df['h1'] += df['is_bold'] * 2 + df['large_gap_before'] * 2
+    scores_df['h2'] += df['is_bold'] * 1 + df['large_gap_before'] * 1
+    scores_df['h1'] += (df['has_heading_keyword']) * 2
+    scores_df['h2'] += (df['has_heading_keyword']) * 1
+
+    df['level'] = scores_df.idxmax(axis=1)
+    total_scores = scores_df.sum(axis=1)
+    df['confidence'] = scores_df.max(axis=1) / total_scores.replace(0, 1)
+
+    # Filter candidates
+    candidates = df[(df['confidence'] > 0.30) & (df['level'] != 'none')].copy()
+    
+    # --- Advanced Title Extraction ---
+    title_candidates = candidates[(candidates['level'] == 'title') & (candidates['page'] == 1)]
+    merged_titles = merge_candidates(title_candidates, is_title=True)
+    
+    final_title = ""
+    if merged_titles:
+        # Score each merged candidate and find the best one
+        scored_titles = [(cand, score_title_candidate(cand)) for cand in merged_titles]
+        if scored_titles:
+            best_title_candidate = max(scored_titles, key=lambda item: item[1])
+            # Only accept if score is positive
+            if best_title_candidate[1] > 0:
+                final_title = best_title_candidate[0]['text']
+
+    # --- Outline Extraction ---
+    outline_candidates = candidates[candidates['level'] != 'title']
+    merged_outline = merge_candidates(outline_candidates)
+    
+    # Format final outline
+    outline = [
+        {'level': item['level'].upper(), 'text': item['text'], 'page': item['page']}
+        for item in merged_outline
+    ]
+
+    return {'title': final_title, 'outline': outline}
