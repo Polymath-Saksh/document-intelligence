@@ -13,3 +13,7 @@ models/all-MiniLM-L12-v2
 .gitattributes
 .gitignore
 .chatignore
+tests_completed/
+input/
+outputs/
+model.png

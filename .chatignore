@@ -15,5 +15,6 @@ __pycache__/
 .vscode/
 *.egg-info/
 # Ignore test outputs and large data
-/test/outputs/
-/test_ds/
+tests_completed/
+input/
+output/

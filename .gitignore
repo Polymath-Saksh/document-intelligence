@@ -1,4 +1,3 @@
-test_ds/
 __pycache__/
 *.pyc
 *.ipynb
@@ -9,3 +8,7 @@ models/all-MiniLM-L6-v2
 models/all-MiniLM-L12-v2
 .cache/
 .env
+tests_completed/
+input/
+output/
+.github/
