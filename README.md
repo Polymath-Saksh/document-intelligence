@@ -173,7 +173,7 @@ This solution was realized with the support of Gemini, Perplexity, and GitHub Ch
 
 ## Copyright
 
-© 2024 Team Sentinels (Saksham Kumar, Aloukik Joshi, Nihal Pandey).  
+© Team Sentinels (Saksham Kumar, Aloukik Joshi, Nihal Pandey).  
 All rights reserved. Team members possess exclusive rights to this solution, along with Adobe for the purpose of the competition.  
 Unauthorized copying, distribution, or use of this code or documentation is strictly prohibited and liable to legal action.
 
