@@ -68,6 +68,15 @@ Our solution employs a multi-stage, hybrid pipeline that combines structural doc
 
 All dependencies are listed in [requirements.txt](requirements.txt) and are installed within the Docker container.
 
+## 🤖 GitHub Copilot Integration
+
+This repository is fully configured for GitHub Copilot development assistance. See [COPILOT.md](COPILOT.md) for detailed setup instructions and usage tips.
+
+**Quick Start:**
+1. Open the project in VS Code
+2. Install recommended extensions (including GitHub Copilot)
+3. Run `python test_copilot_setup.py` to verify the setup
+
 ## How to Build and Run
 
 The solution is containerized using Docker for a consistent and reproducible environment.

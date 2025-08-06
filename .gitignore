@@ -11,3 +11,4 @@ models/all-MiniLM-L12-v2
 tests_completed/
 input/
 output/
+test_copilot_setup.py
