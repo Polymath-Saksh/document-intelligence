@@ -1,0 +1,40 @@
+{
+    "python.defaultInterpreterPath": "./venv/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.completeFunctionParens": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "github.copilot.enable": {
+        "*": true,
+        "yaml": true,
+        "plaintext": true,
+        "markdown": true,
+        "python": true,
+        "json": true,
+        "dockerfile": true
+    },
+    "github.copilot.advanced": {
+        "listCount": 10,
+        "inlineSuggestCount": 3
+    },
+    "editor.inlineSuggest.enabled": true,
+    "editor.suggest.insertMode": "insert",
+    "editor.acceptSuggestionOnCommitCharacter": true,
+    "editor.tabCompletion": "on",
+    "editor.wordBasedSuggestions": "matchingDocuments",
+    "files.associations": {
+        "*.py": "python",
+        "requirements*.txt": "pip-requirements",
+        "Dockerfile*": "dockerfile"
+    },
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true,
+    "[python]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.detectIndentation": false
+    }
+}
