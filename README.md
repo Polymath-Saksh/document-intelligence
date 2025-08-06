@@ -1,10 +1,8 @@
-# Adobe India Hackathon: Document Intelligence (Round 1B)
+# Document Intelligence System
 
-This repository contains the solution for Round 1B of the "Connecting the Dots" Hackathon by Team Sentinels.
+This repository contains an intelligent document analysis system that extracts and prioritizes the most relevant sections from a collection of PDFs based on a specific user persona and their job-to-be-done. The solution is designed to run entirely offline, leveraging a hybrid approach that combines structural analysis, semantic understanding, and keyword relevance.
 
-The goal is to build a system that acts as an intelligent document analyst, extracting and prioritizing the most relevant sections from a collection of PDFs based on a specific user persona and their job-to-be-done. The solution is designed to run entirely offline, leveraging a hybrid approach that combines structural analysis, semantic understanding, and keyword relevance.
-
-## Team Sentinels
+## Contributors
 
 - [Saksham Kumar](https://github.com/sakshamkumar04)
 - [Aloukik Joshi](https://github.com/aloukikjoshi)
@@ -19,7 +17,7 @@ Our solution employs a multi-stage, hybrid pipeline that combines structural doc
 
 ### 1. Parallel Structure Extraction
 
-- Reuses the high-performance outline extractor from Round 1A.
+- Uses a high-performance outline extractor for document processing.
 - Processes all input PDFs in parallel, with each document handled by a separate CPU core.
 - Extracts all titles and headings (H1, H2, H3) for each document, serving as candidate sections for relevance ranking.
 
@@ -50,7 +48,7 @@ Our solution employs a multi-stage, hybrid pipeline that combines structural doc
 ### 5. Final Output Generation
 
 - Aggregates results, including ranked section titles and refined subsection text.
-- Formats output into `challenge1b_output.json` with all required metadata.
+- Formats output into `output.json` with all required metadata.
 
 ## Models and Libraries Used
 
@@ -63,7 +61,7 @@ Our solution employs a multi-stage, hybrid pipeline that combines structural doc
 - `torch`: Framework for running the sentence-transformer model.
 - `sentence-transformers`: For loading and using the embedding model.
 - `rank_bm25`: For keyword-based relevance scoring.
-- `pymupdf`: For efficient PDF text extraction (reused from Round 1A).
+- `pymupdf`: For efficient PDF text extraction.
 - `numpy` & `pandas`: For numerical operations and data handling.
 
 All dependencies are listed in [requirements.txt](requirements.txt) and are installed within the Docker container.
@@ -87,7 +85,7 @@ Before running the solution, ensure your directories are organized as follows:
 ```
 root/
 ├── input/
-│   ├── challenge1b_input.json
+│   ├── input.json
 │   └── PDFs/           # All required PDF documents
 ├── output/             # Results will be written here (create empty)
 ├── Dockerfile
@@ -100,7 +98,7 @@ root/
 After building the image:
 
 1. Create an `input` directory containing in the root directory of your project. Refer to the expected directory structure above.
-1. Place `challenge1b_input.json` and a sub-folder `PDFs` with all required documents in your local `input` directory.
+1. Place `input.json` and a sub-folder `PDFs` with all required documents in your local `input` directory.
 1. (Optional) Create an empty local directory for results (e.g., `output`).
 1. Run the following command from the directory containing your `input` and `output` folders:
 
@@ -108,7 +106,7 @@ After building the image:
    docker run --rm -v $(pwd)/input:/app/input -v $(pwd)/output:/app/output --network none document-intelligence:somerandomidentifier
    ```
 
-The script inside the container will process the input JSON and PDF collection, and generate `challenge1b_output.json` in `/app/output`.
+The script inside the container will process the input JSON and PDF collection, and generate `output.json` in `/app/output`.
 
 ---
 
@@ -173,8 +171,8 @@ This solution was realized with the support of Gemini, Perplexity, and GitHub Ch
 
 ## Copyright
 
-© Team Sentinels (Saksham Kumar, Aloukik Joshi, Nihal Pandey).  
-All rights reserved. Team members possess exclusive rights to this solution, along with Adobe for the purpose of the competition.  
+© Contributors (Saksham Kumar, Aloukik Joshi, Nihal Pandey).  
+All rights reserved.  
 Unauthorized copying, distribution, or use of this code or documentation is strictly prohibited and liable to legal action.
 
 ---

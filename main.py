@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Round-1B | Persona-Aware PDF Pipeline
+Document Intelligence | Persona-Aware PDF Pipeline
 ------------------------------------
 CLI
     python main.py <input_dir> <output_dir>
 
-• Reads  challenge1b_input.json  from <input_dir>.
-• Runs the original Round-1A extractor *in parallel* on every PDF
+• Reads  input.json  from <input_dir>.
+• Runs the PDF outline extractor *in parallel* on every PDF
   (each worker opens the file from bytes once).
 • Embeds + ranks sections with Granite-107 M embeddings and BM25.
-• Refines best sections (thread-pool) and writes  challenge1b_output.json
+• Refines best sections (thread-pool) and writes  output.json
   to <output_dir>.
 """
 
@@ -23,7 +23,7 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 
-# Round-1B modules
+# Document Intelligence modules
 from semantic_analyzer    import SemanticAnalyzer
 from relevance_scorer     import RelevanceScorer
 from subsection_extractor import SubsectionExtractor
@@ -34,20 +34,20 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 # ─────────────────────────  Helpers  ──────────────────────────
 def _extract_outline_blob(pdf_path: str) -> Dict:
-    """Worker: run Round-1A on a PDF file path."""
+    """Worker: run PDF outline extraction on a PDF file path."""
     # This import is intentionally local to the worker process
     from r1a.enhanced_pdf_extractor import process_pdf_enhanced
     return process_pdf_enhanced(pdf_path)
 
 
 def _load_input(inp_dir: str) -> Dict:
-    with open(os.path.join(inp_dir, "challenge1b_input.json"), encoding="utf-8") as fh:
+    with open(os.path.join(inp_dir, "input.json"), encoding="utf-8") as fh:
         return json.load(fh)
 
 
 def _write_output(out_dir: str, data: Dict) -> None:
     os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, "challenge1b_output.json"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(out_dir, "output.json"), "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2, ensure_ascii=False)
 
 
@@ -63,7 +63,7 @@ def run_pipeline(input_dir: str, output_dir: str) -> None:
         "processing_timestamp": datetime.now(timezone.utc).isoformat()
     }
 
-    # 1.  Parallel outline extraction (Round-1A)
+    # 1.  Parallel outline extraction
     pdf_dir  = os.path.join(input_dir, "PDFs")
     outlines: Dict[str, Dict] = {}
     pdf_paths = [os.path.join(pdf_dir, d["filename"]) for d in req["documents"]]
